@@ -1,0 +1,15 @@
+version = 0.1
+
+[default.global.parameters]
+stack_name = "cnu-cc-guide-dev"
+
+[default.build.parameters]
+cached = true
+
+[default.deploy.parameters]
+region = "ap-northeast-2"
+capabilities = "CAPABILITY_IAM"
+resolve_s3 = true
+confirm_changeset = true
+s3_prefix = "cnu-cc-guide-dev"
+tags = "project=\"cnu-cc-guide\""

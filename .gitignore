@@ -1,0 +1,23 @@
+# SAM build 결과
+.aws-sam/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+
+# 자격 증명과 비밀 값: 절대 커밋하지 않습니다
+.env
+.env.*
+*.pem
+credentials
+.aws/
+
+# Claude Code 개인 설정
+.claude/settings.local.json
+
+# OS, 편집기
+.DS_Store
+.idea/
+.vscode/

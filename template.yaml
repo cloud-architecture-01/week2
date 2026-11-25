@@ -1,0 +1,106 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  cnu-cc-guide (컴융 길잡이) 2주차 테스트 API.
+  GET /health 는 Lambda 실행을, GET /bedrock-ping 은 Bedrock Claude 호출을 확인합니다.
+
+Parameters:
+  StageName:
+    Type: String
+    Default: dev
+  ModelId:
+    Type: String
+    Description: >
+      Bedrock에서 호출할 Claude 모델의 inference profile ID.
+      서울 리전에서 쓸 수 있는 ID는 aws bedrock list-inference-profiles --region ap-northeast-2 로 확인합니다.
+    Default: global.anthropic.claude-haiku-4-5-20251001-v1:0
+
+Globals:
+  Function:
+    Runtime: python3.13
+    Architectures:
+      - arm64
+    MemorySize: 128
+    Timeout: 5
+    Environment:
+      Variables:
+        STAGE: !Ref StageName
+    Tags:
+      project: cnu-cc-guide
+
+Resources:
+  Api:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: cnu-cc-guide-api
+      StageName: !Ref StageName
+      MethodSettings:
+        - ResourcePath: "/*"
+          HttpMethod: "*"
+          ThrottlingRateLimit: 10
+          ThrottlingBurstLimit: 20
+
+  HealthLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /aws/lambda/cnu-cc-guide-health
+      RetentionInDays: 14
+
+  BedrockPingLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /aws/lambda/cnu-cc-guide-bedrock-ping
+      RetentionInDays: 14
+
+  HealthFunction:
+    Type: AWS::Serverless::Function
+    DependsOn: HealthLogGroup
+    Properties:
+      FunctionName: cnu-cc-guide-health
+      CodeUri: src/health/
+      Handler: app.handler
+      Events:
+        Health:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /health
+            Method: get
+
+  BedrockPingFunction:
+    Type: AWS::Serverless::Function
+    DependsOn: BedrockPingLogGroup
+    Properties:
+      FunctionName: cnu-cc-guide-bedrock-ping
+      CodeUri: src/bedrock_ping/
+      Handler: app.handler
+      MemorySize: 256
+      Timeout: 30
+      Environment:
+        Variables:
+          MODEL_ID: !Ref ModelId
+      Policies:
+        - Statement:
+            - Sid: InvokeClaudeOnly
+              Effect: Allow
+              Action:
+                - bedrock:InvokeModel
+              Resource:
+                - !Sub arn:aws:bedrock:*:${AWS::AccountId}:inference-profile/*anthropic.claude-*
+                - arn:aws:bedrock:*::foundation-model/anthropic.claude-*
+      Events:
+        BedrockPing:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: /bedrock-ping
+            Method: get
+
+Outputs:
+  ApiBaseUrl:
+    Description: 테스트 API 기본 주소
+    Value: !Sub https://${Api}.execute-api.${AWS::Region}.amazonaws.com/${StageName}
+  HealthUrl:
+    Value: !Sub https://${Api}.execute-api.${AWS::Region}.amazonaws.com/${StageName}/health
+  BedrockPingUrl:
+    Value: !Sub https://${Api}.execute-api.${AWS::Region}.amazonaws.com/${StageName}/bedrock-ping
